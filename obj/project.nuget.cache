@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "hACDs5pyP0bUdlbKjuBa+VCycVmrBR7lEAH8CT/FUCZHxOL7yHxZycfNZFj0DQGx5Ja+kR0OwL3E3PYuzy3+rw==",
+  "success": true,
+  "projectFilePath": "C:\\Users\\mattp\\OneDrive\\Desktop\\Trenches\\24HourSurvival\\24HourSurvival.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\mattp\\.nuget\\packages\\monogame.content.builder.task\\3.8.1.303\\monogame.content.builder.task.3.8.1.303.nupkg.sha512",
+    "C:\\Users\\mattp\\.nuget\\packages\\monogame.framework.desktopgl\\3.8.1.303\\monogame.framework.desktopgl.3.8.1.303.nupkg.sha512"
+  ],
+  "logs": []
+}
