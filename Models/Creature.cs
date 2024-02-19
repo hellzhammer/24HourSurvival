@@ -8,48 +8,55 @@ using System.Diagnostics;
 
 namespace _24HourSurvival.Models
 {
-    public class Creature : GameObject
+    public class Creature : Creature_Model
     {
-        private enum State { Wander, Feed, Sleep }
-        private State _state = State.Wander;
-
-        private float score = 0.0f;
-
-        private float base_value = 100;
-        private float calories_from_food = 25;
-
-        public float hunger = 100;
-        public float health = 100;
-        public float energy = 100;
-
-        // movement parameters
-        public Vector2 target_pos { get; set; }
-        private Vector2 direction = Vector2.Zero;
-        public float speed = 60;
-        public float stop_distance = 0.8f;
-
-        private Vector2 LastKnownFoodPos;
-
-        float smell_radius = 320;
-        float sight_radius = 256;
-        float move_radius = 320;
-
-        public Creature(string ID, string obj_name, Texture2D texture, Vector2 position) : base(ID, obj_name, texture, position)
-        {
+        public Creature(string ID, string obj_name, Texture2D texture, Vector2 position, int met_base = 1, int enr_base = 1, int reg_base = 2) : base(ID, obj_name, texture, position, met_base, enr_base, reg_base)
+        {        
             this.OnLeftClick += () => {
                 Debug.WriteLine("Health: " + this.health);
                 Debug.WriteLine("Hunger: " + this.hunger);
                 Debug.WriteLine("Energy: " + this.energy);
+
                 MainGui.SetNewUnitSelected(this);
-                MainGui.Update_Info("Creature Score: " + this.score);
+                MainGui.Update_Info("Score: " + this.score);
             };
 
-            target_pos = Game1.spawner.position;
+            target_pos = SimpleSurvival.spawner.position;
+        }
+
+        public string get_state()
+        {
+            return this._state.ToString();
         }
 
         public override void Draw(SpriteBatch batch)
         {
-            batch.Draw(
+            if (this.draw_radial && MainGui.selected_creature  != this)
+            {
+                batch.Draw(
+                Engine.CreateCircle(
+                    SimpleSurvival._graphics.GraphicsDevice,
+                    move_radius / 4, 
+                    (int)move_radius / 2, 
+                    (int)move_radius / 2, 
+                    Color.LightBlue * 0.5f
+                    ),
+
+                position,
+                null,
+                Color.White,
+                rotation,
+                new Vector2(
+                    (move_radius / 2) / 2, 
+                    (move_radius / 2) / 2
+                    ),
+                scale,
+                SpriteEffects.None,
+                1
+                );
+            }
+
+                batch.Draw(
                 this.object_sprite,
                 position,
                 null,
@@ -67,7 +74,7 @@ namespace _24HourSurvival.Models
         /// </summary>
         public void DetermineState()
         {
-            var outp = Game1.survival_sim.nets[this.id].Process(
+            var outp = SimpleSurvival.survival_sim.nets[this.id].Process(
                 new double[] 
                 { 
                     (double)this.health, 
@@ -132,13 +139,13 @@ namespace _24HourSurvival.Models
             if (dist <= this.stop_distance)
             {
                 List<Tile> tiles = new List<Tile>();
-                for (int i = 0; i < Game1.world_map.Length; i++)
+                for (int i = 0; i < SimpleSurvival.world_map.Length; i++)
                 {
-                    for (int j = 0; j < Game1.world_map[i].Length; j++)
+                    for (int j = 0; j < SimpleSurvival.world_map[i].Length; j++)
                     {
-                        if (Game1.world_map[i][j].object_name == "GrassTile" && Vector2.Distance(this.position, Game1.world_map[i][j].position) < move_radius && Vector2.Distance(this.position, Game1.world_map[i][j].position) > 64)
+                        if (SimpleSurvival.world_map[i][j].object_name == "GrassTile" && Vector2.Distance(this.position, SimpleSurvival.world_map[i][j].position) < move_radius && Vector2.Distance(this.position, SimpleSurvival.world_map[i][j].position) > 64)
                         {
-                            tiles.Add(Game1.world_map[i][j]);
+                            tiles.Add(SimpleSurvival.world_map[i][j]);
                         }
                     }
                 }
@@ -156,12 +163,12 @@ namespace _24HourSurvival.Models
         {           
             // find all nearby food.
             List<Food_Item> sensed_food = new List<Food_Item>();
-            for (int f = 0; f < Game1.Food.Count; f++)
+            for (int f = 0; f < SimpleSurvival.Food.Count; f++)
             {
-                var dist = Vector2.Distance(Game1.Food[f].position, this.position);
+                var dist = Vector2.Distance(SimpleSurvival.Food[f].position, this.position);
                 if (dist < smell_radius || dist < sight_radius)
                 {
-                    sensed_food.Add(Game1.Food[f]);
+                    sensed_food.Add(SimpleSurvival.Food[f]);
                 }
             }
 
@@ -190,12 +197,12 @@ namespace _24HourSurvival.Models
         {
             // find all nearby food.
             List<Food_Item> sensed_food = new List<Food_Item>();
-            for (int f = 0; f < Game1.Food.Count; f++)
+            for (int f = 0; f < SimpleSurvival.Food.Count; f++)
             {
-                var dist = Vector2.Distance(Game1.Food[f].position, this.position);
+                var dist = Vector2.Distance(SimpleSurvival.Food[f].position, this.position);
                 if (dist < smell_radius || dist < sight_radius)
                 {
-                    sensed_food.Add(Game1.Food[f]);
+                    sensed_food.Add(SimpleSurvival.Food[f]);
                 }
             }
 
@@ -222,101 +229,118 @@ namespace _24HourSurvival.Models
             }
         }
 
+        private DateTime next_run = DateTime.Now;
         public void UpdateCreatureVitals_Base_AI(GameTime gt)
         {
-            // if starving, reduce health and score
-            if(this.hunger <= 0.0f)
+            Handle_Hunger(gt);
+
+            Handle_Sleep(gt);
+
+            ResetOverage();
+
+            Handle_Score(gt);
+
+            if (score < 0)
+            {
+                score = 0;
+            }
+
+            // once every second brain activates
+            if (DateTime.Now > next_run)
+            {
+                this.DetermineState();
+                next_run = DateTime.Now.AddSeconds(1);
+            }
+        }
+
+        private void Handle_Score(GameTime gt)
+        {
+            if(hunger <= 0 || energy <= 0)
+                this.score -= (float)gt.ElapsedGameTime.TotalSeconds / 10;
+
+            if (SimpleSurvival.survival_sim.nets.ContainsKey(this.id))
+            {
+                SimpleSurvival.survival_sim.nets[this.id].current_fitness = score;
+            }
+        }
+
+        private void Handle_Hunger(GameTime gt)
+        {
+            // if starving
+            if (this.hunger <= 0.0f)
             {
                 this.health -= (float)gt.ElapsedGameTime.TotalSeconds;
-                this.score -= (float)gt.ElapsedGameTime.TotalSeconds;
             }
 
             // if not starving, reduce the hunger level
             if (this.hunger > 0.0f)
             {
-                this.hunger -= (float)gt.ElapsedGameTime.TotalSeconds;
+                this.hunger -= (float)gt.ElapsedGameTime.TotalSeconds * actual_metablolism;
             }
+        }
 
-            // handle the state machine
-
-            // if hungry, change the state to find food. 
-            if (this._state == State.Wander && this.hunger <= 35)
-            {
-                //this._state = State.Feed;
-                this.DetermineState();
-            }
-            // ensure creature eats its fill
-            else if (this._state == State.Feed && this.hunger > 35 && this.hunger < base_value)
-            {
-                //this._state = State.Feed;
-                this.DetermineState();
-            }
-            // if not hungry, set back to wander.
-            else if(this._state == State.Feed && this.hunger >= base_value)
-            {
-                //this._state = State.Wander;
-                this.DetermineState();
-            }
-
+        private void Handle_Sleep(GameTime gt)
+        {
             if (_state != State.Sleep)
             {
                 // reduce energy while awake
                 if (this.energy > 0.0f)
                 {
-                    this.energy -= (float)gt.ElapsedGameTime.TotalSeconds;
+                    this.energy -= (float)gt.ElapsedGameTime.TotalSeconds * actual_energy_use;
                 }
 
                 // if there is no energy, then put creature to sleep, cannot move with no energy;
                 if (this.energy <= 0)
                 {
                     //this._state = State.Sleep;
-                    this.DetermineState();
+                    this.actual_metablolism += (int)(float)gt.ElapsedGameTime.TotalSeconds / 10;
                 }
             }
-            
+
             if (this._state == State.Sleep)
             {
                 // sleep and recover
-                if (this.energy < base_value)
+                if (this.energy < base_attribute_value)
                 {
-                    this.energy += (float)gt.ElapsedGameTime.TotalSeconds * 8;
+                    this.energy += (float)gt.ElapsedGameTime.TotalSeconds * actual_regen_rate;
+                    this.score += (float)gt.ElapsedGameTime.TotalSeconds;
                 }
 
                 // wake up and roam
-                if (energy >= base_value)
+                if (energy >= base_attribute_value && actual_metablolism > metabolism_base)
                 {
-                    //this._state = State.Wander;
-                    this.DetermineState();
+                    this.actual_metablolism = metabolism_base;
                 }
             }
+        }
 
+        /// <summary>
+        /// if over n set to n, if less than 0 set to 0
+        /// </summary>
+        private void ResetOverage()
+        {
             // ensure all values are within thresholds.
-            if (this.health > base_value)
+            if (this.health > base_attribute_value)
             {
-                this.health = base_value;
+                this.health = base_attribute_value;
             }
             else if (this.health < 0)
                 this.health = 0;
 
-            if (this.energy > base_value)
+            if (this.energy > base_attribute_value)
             {
-                this.energy = base_value;
+                this.energy = base_attribute_value;
             }
             else if (this.energy < 0)
                 this.energy = 0;
 
-            if (this.hunger > base_value)
+            if (this.hunger > base_attribute_value)
             {
-                this.hunger = base_value;
+                this.hunger = base_attribute_value;
             }
             else if (this.hunger < 0)
             {
                 this.hunger = 0;
-            }
-
-            if (score < 0)
-            {
-                score = 0;
             }
         }
 
@@ -349,9 +373,9 @@ namespace _24HourSurvival.Models
 
         private void CanEatFoodCheck()
         {
-            foreach (var item in Game1.Food)
+            foreach (var item in SimpleSurvival.Food)
             {
-                if (!item.consumed && this.hunger < base_value)
+                if (!item.consumed && this.hunger < base_attribute_value)
                 {
                     var cre_rect = new Rectangle(this.position.ToPoint(), new Point(32, 32));
                     var food_rect = new Rectangle(item.position.ToPoint(), new Point(32, 32));
@@ -360,14 +384,15 @@ namespace _24HourSurvival.Models
                         item.consumed = true;
                         this.score++;
                         this.hunger += calories_from_food;
-                        if (this.health < base_value)
+
+                        if (this.health < base_attribute_value)
                         {
                             this.health += calories_from_food * 0.5f;
                         }
 
-                        if (this.energy < base_value)
+                        if (this.energy < base_attribute_value)
                         {
-                            this.energy += calories_from_food * 0.5f;
+                            this.energy += 2;
                         }
                     }
                 }

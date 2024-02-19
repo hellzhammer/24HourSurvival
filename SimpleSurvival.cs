@@ -4,11 +4,12 @@ using Engine_lib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using System;
 using System.Collections.Generic;
 
 namespace _24HourSurvival
 {
-    public class Game1 : Engine
+    public class SimpleSurvival : Engine
     {
         public static bool Pause = false;
         public static bool TrainingAlgorithm = false;
@@ -30,8 +31,22 @@ namespace _24HourSurvival
         public static List<Creature> creatures = new List<Creature>();
         public static Creature_Spawner spawner { get; set; }
 
-        public Game1() : base("Default")
+        public static Dictionary<int, (string gene_id, int energy_use, int metabolism, int regen_rate)> genes { get; set; }
+
+        public SimpleSurvival() : base("Default")
         {
+            genes = new Dictionary<int, (string gene_id, int energy_use, int metabolism, int regen_rate)>();
+            var codons = Generate_Codons(102292);
+            Random r = new Random(102292);
+            for (int i = 0; i < codons.Count; i++)
+            {
+                genes.Add(i, new (codons[i],
+                    r.Next(-1, 4), 
+                    r.Next(-1, 4), 
+                    r.Next(-1, 4))
+                    );
+            }
+
             Content.RootDirectory = "Content";
             IsMouseVisible = true;
         }
@@ -74,8 +89,8 @@ namespace _24HourSurvival
             world_map = BuildMap(200, 200);
 
             // place the spawner
-            int x = new System.Random().Next(12, world_map[0].Length - 12) * 32;
-            int y = new System.Random().Next(12, world_map.Length - 12) * 32;
+            int x = new Random().Next(12, world_map[0].Length - 12) * 32;
+            int y = new Random().Next(12, world_map.Length - 12) * 32;
             spawner = new Creature_Spawner("1", "Spawner", spawnerTexture, new Vector2(x,y));
 
             ResetPopulation();
@@ -104,8 +119,13 @@ namespace _24HourSurvival
         bool training = false;
         protected override void Update(GameTime gameTime)
         {
-            if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
-                Exit();
+            if (Input.KeyUp(Keys.Escape))
+            {
+                if (MainGui.selected_creature != null)
+                    MainGui.SetNewUnitSelected(null);
+                else
+                    Exit();
+            }
 
             if (CalendarSystem.TotalDays == 2)
                 TrainingAlgorithm = true;
@@ -114,13 +134,14 @@ namespace _24HourSurvival
             {
                 // TODO: Add your update logic here
                 Cleanse_Creatures();
+                
                 Clear_Eaten_Food();
 
                 camera.Update();
 
-                Update_Food();
-
                 Update_Creatures(gameTime);
+
+                Update_Food();
 
                 gui.Update();
             }
@@ -139,6 +160,8 @@ namespace _24HourSurvival
                     CalendarSystem.TotalDays = 0;
 
                     ResetPopulation();
+
+                    MainGui.SetNewUnitSelected(null);
 
                     // reset flags.
                     training = false;
@@ -178,6 +201,21 @@ namespace _24HourSurvival
             foreach (var item in creatures)
             {
                 item.Draw(this._spriteBatch);
+            }
+
+            if (MainGui.selected_creature != null)
+            {
+                _spriteBatch.Draw(
+                Engine.CreateCircle(SimpleSurvival._graphics.GraphicsDevice, MainGui.selected_creature.move_radius, (int)MainGui.selected_creature.move_radius * 2, (int)MainGui.selected_creature.move_radius * 2, Color.Red * 0.5f),
+                MainGui.selected_creature.position,
+                null,
+                Color.White,
+                MainGui.selected_creature.rotation,
+                new Vector2((MainGui.selected_creature.move_radius * 2) / 2, (MainGui.selected_creature.move_radius* 2) / 2),
+                MainGui.selected_creature.scale,
+                SpriteEffects.None,
+                1
+                );
             }
 
             gui.Draw(_spriteBatch, camera.GetViewMatrix());
@@ -292,6 +330,12 @@ namespace _24HourSurvival
             {
                 if (creatures[i].health <= 0)
                 {
+                    // dead creatures cannot carry on with their scores. 
+                    // death resets score to 0;
+                    if (survival_sim.nets.ContainsKey(creatures[i].id))
+                    {
+                        survival_sim.nets[creatures[i].id].network_score = 0;
+                    }
                     indexes.Add(creatures[i]);
                 }
             }
@@ -313,6 +357,57 @@ namespace _24HourSurvival
             creatures.Add(c);
 
             return;
+        }
+
+        public List<string> Generate_Codons(int seed = 1000)
+        {
+            List<string> ids = new List<string>();
+            int total_codons = 64;
+            bool run = true;
+            string[] nucleotides = new string[] { "a", "c", "g", "t" };
+            Random r = new Random(seed);
+
+            do
+            {
+                string Codon = string.Empty;
+
+                // build a new codon of
+                // up to 9 different parts
+                for (int i = 0; i < 3; i++)
+                {
+                    string nuc = string.Empty;
+
+                    for (int j = 0; j < 1; j++)
+                    {
+                        // get the next id at random
+                        int id = r.Next(0, nucleotides.Length);
+
+                        // add new nucleotide to string
+                        nuc += nucleotides[id];
+                    }
+
+                    // add new string to codon
+                    Codon += nuc;
+                }
+
+                // if the new created codon
+                // does not already exist,
+                // add it to list
+                if (!ids.Contains(Codon))
+                {
+                    ids.Add(Codon);
+                }
+
+                // if codon count is == total
+                // codons then we can break.
+                if (ids.Count == total_codons)
+                {
+                    run = false;
+                }
+
+            } while (run);
+
+            return ids;
         }
     }
 }

@@ -6,7 +6,7 @@ namespace _24HourSurvival.Models
 {
     public class NEAT_Survival_Sim : NEAT_Project
     {
-        Network winning_network { get; set; }
+        public Network winning_network { get; private set; }
         public NEAT_Survival_Sim(
             int input_count,
             int output_count,
@@ -16,6 +16,7 @@ namespace _24HourSurvival.Models
             int training_epochs
             )
         {
+            this.max_hidden_nodes = 64 - (input_count + output_count);
             this.mutate_activation = false;
             this.Allowed_Activations = new List<string>();
             this.Allowed_Activations.Add("Sigmoid");
@@ -33,7 +34,7 @@ namespace _24HourSurvival.Models
             this.PopulationMax = pop_max;
             this.total_epochs = training_epochs;
 
-            this.totalSpeciesCountTarget = 10;
+            this.totalSpeciesCountTarget = 15;
 
             this.Hidden_Activation_Function = new Sigmoid();
             this.Output_Activation_Function = new Sigmoid();
@@ -53,6 +54,11 @@ namespace _24HourSurvival.Models
             else
             {
                 // keep running simulation
+                string _id = this.Find_Fittest_Network();
+                if (nets.ContainsKey(_id))
+                {
+                    winning_network = nets[_id];
+                }
 
                 // run the training algorithm
                 this.Train();

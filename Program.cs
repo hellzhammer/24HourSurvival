@@ -1,3 +1,3 @@
 ﻿
-using var game = new _24HourSurvival.Game1();
+using var game = new _24HourSurvival.SimpleSurvival();
 game.Run();
