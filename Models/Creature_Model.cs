@@ -1,4 +1,5 @@
-﻿using Engine_lib;
+﻿using _24HourSurvival.GUI;
+using Engine_lib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -6,9 +7,6 @@ namespace _24HourSurvival.Models
 {
     public class Creature_Model : GameObject
     {
-        protected enum State { Wander, Feed, Sleep }
-        protected State _state = State.Wander;
-
         protected float score = 0.0f;
         public float hunger = 100;
         public float health = 100;
@@ -22,8 +20,6 @@ namespace _24HourSurvival.Models
         protected Vector2 direction = Vector2.Zero;
         public float speed = 60;
         public float stop_distance = 0.8f;
-
-        protected Vector2 LastKnownFoodPos;
 
         public readonly float smell_radius = 320;
         public readonly float sight_radius = 256;
@@ -57,6 +53,46 @@ namespace _24HourSurvival.Models
             {
                 this.draw_radial = false;
             };
+        }
+
+        public override void Draw(SpriteBatch batch)
+        {
+            if (this.draw_radial && MainGui.selected_creature != this)
+            {
+                batch.Draw(
+                Engine.CreateCircle(
+                    SimpleSurvival._graphics.GraphicsDevice,
+                    move_radius / 4,
+                    (int)move_radius / 2,
+                    (int)move_radius / 2,
+                    Color.LightBlue * 0.5f
+                    ),
+
+                position,
+                null,
+                Color.White,
+                rotation,
+                new Vector2(
+                    (move_radius / 2) / 2,
+                    (move_radius / 2) / 2
+                    ),
+                scale,
+                SpriteEffects.None,
+                1
+                );
+            }
+
+            batch.Draw(
+            this.object_sprite,
+            position,
+            null,
+            Color.White,
+            rotation,
+            new Vector2(16, 16),
+            scale,
+            SpriteEffects.None,
+            1
+            );
         }
     }
 }

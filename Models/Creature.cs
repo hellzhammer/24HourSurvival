@@ -1,5 +1,5 @@
 ﻿using _24HourSurvival.GUI;
-using Engine_lib;
+using Kronus_Neural.NEAT;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
@@ -10,6 +10,12 @@ namespace _24HourSurvival.Models
 {
     public class Creature : Creature_Model
     {
+        protected Vector2 LastKnownFoodPos;
+
+        protected enum State { Wander, Feed, Sleep }
+        protected State _state = State.Wander;
+        public readonly string Gene_Sequence = string.Empty;
+
         public Creature(string ID, string obj_name, Texture2D texture, Vector2 position, int met_base = 1, int enr_base = 1, int reg_base = 2) : base(ID, obj_name, texture, position, met_base, enr_base, reg_base)
         {        
             this.OnLeftClick += () => {
@@ -22,52 +28,13 @@ namespace _24HourSurvival.Models
             };
 
             target_pos = SimpleSurvival.spawner.position;
+            this.Gene_Sequence = this.GeneSequence();
         }
 
         public string get_state()
         {
             return this._state.ToString();
-        }
-
-        public override void Draw(SpriteBatch batch)
-        {
-            if (this.draw_radial && MainGui.selected_creature  != this)
-            {
-                batch.Draw(
-                Engine.CreateCircle(
-                    SimpleSurvival._graphics.GraphicsDevice,
-                    move_radius / 4, 
-                    (int)move_radius / 2, 
-                    (int)move_radius / 2, 
-                    Color.LightBlue * 0.5f
-                    ),
-
-                position,
-                null,
-                Color.White,
-                rotation,
-                new Vector2(
-                    (move_radius / 2) / 2, 
-                    (move_radius / 2) / 2
-                    ),
-                scale,
-                SpriteEffects.None,
-                1
-                );
-            }
-
-                batch.Draw(
-                this.object_sprite,
-                position,
-                null,
-                Color.White,
-                rotation,
-                new Vector2(16, 16),
-                scale,
-                SpriteEffects.None,
-                1
-                );
-        }
+        }        
 
         /// <summary>
         /// this function runs inputs through the neural networks and determines the state
@@ -151,7 +118,7 @@ namespace _24HourSurvival.Models
                 }
 
                 if(tiles.Count > 0)
-                    target_pos = tiles[new Random().Next(0, tiles.Count - 1)].position;
+                    target_pos = tiles[SimpleSurvival.survival_sim.r.Next(0, tiles.Count - 1)].position;
             }
             else
             {
@@ -229,7 +196,6 @@ namespace _24HourSurvival.Models
             }
         }
 
-        private DateTime next_run = DateTime.Now;
         public void UpdateCreatureVitals_Base_AI(GameTime gt)
         {
             Handle_Hunger(gt);
@@ -246,11 +212,46 @@ namespace _24HourSurvival.Models
             }
 
             // once every second brain activates
-            if (DateTime.Now > next_run)
+            if (next_update <= 0)
             {
                 this.DetermineState();
-                next_run = DateTime.Now.AddSeconds(1);
             }
+        }
+
+        public string GeneSequence()
+        {
+            string rtnval = string.Empty;
+
+            if (SimpleSurvival.survival_sim.nets.ContainsKey(this.id))
+            {
+                var net = SimpleSurvival.survival_sim.nets[this.id];
+                if (net != null)
+                {
+                    List<Neuron> neurons = new List<Neuron>();
+                    foreach (var n in net.Input_Neurons)
+                    {
+                        neurons.Add(n.Value);
+                    }
+
+                    foreach (var n in net.Output_Neurons)
+                    {
+                        neurons.Add(n.Value);
+                    }
+
+                    foreach (var n in net.Hidden_Neurons)
+                    {
+                        neurons.Add(n.Value);
+                    }
+
+                    for (int i = 0; i < neurons.Count; i++)
+                    {
+                        var s = SimpleSurvival.codons[int.Parse(neurons[i].gene_id)];
+                        rtnval += s;
+                    }
+                }
+            }
+
+            return rtnval;
         }
 
         private void Handle_Score(GameTime gt)
@@ -293,7 +294,7 @@ namespace _24HourSurvival.Models
                 if (this.energy <= 0)
                 {
                     //this._state = State.Sleep;
-                    this.actual_metablolism += (int)(float)gt.ElapsedGameTime.TotalSeconds / 10;
+                    this.actual_metablolism += (int)gt.ElapsedGameTime.TotalSeconds / 10;
                 }
             }
 

@@ -19,12 +19,17 @@ namespace _24HourSurvival.GUI
         Label MoreInfoLabel { get; set; }
 
         static Label info_label { get; set; }
+        static Label GeneLabel { get; set; }
 
         static Box side_panel_background { get; set; }
         static Label unit_health_label { get; set; }
         static Label unit_energy_label { get; set; }
         static Label unit_state_label { get; set; }
         static Label Unit_Species { get; set; }
+
+        Box pause_background { get; set; }
+        Button save_button { get; set; }
+        Button quit_button { get; set; }
 
         public MainGui(GraphicsDevice dev, SpriteFont _font, string teamname)
         {
@@ -49,6 +54,7 @@ namespace _24HourSurvival.GUI
         private void build(GraphicsDevice dev, string team_name)
         {
             info_label = new Label("update", "Updates", new Vector2(16, 16), 300, 30, dev);
+            GeneLabel = new Label("genes", "Todo", new Vector2(16,64), 300, 30, dev);
             info_label.Set_Background(Color.Black, dev);
 
             Vector2 ui_pos = new Vector2(0, dev.DisplayMode.Height - 120);
@@ -68,6 +74,25 @@ namespace _24HourSurvival.GUI
             unit_energy_label = new Label("sel_health_label", "energy", new Vector2(20, (dev.DisplayMode.Height / 8) + 50), 200, 30, dev);
             unit_state_label = new Label("sel_name_label", "hunger", new Vector2(20, (dev.DisplayMode.Height / 8) + 100), 200, 30, dev);
             Unit_Species = new Label("sel_species_label", "species", new Vector2(16, (dev.DisplayMode.Height / 8) + 150), 300, 30, dev);
+
+            pause_background = new Box("pause_background", new Vector2(650, 250), 300, 300, dev);
+            save_button = new Button(
+                "save", 
+                "Save", 
+                new Vector2(pause_background.Position.X + 25, pause_background.Position.Y + 20),
+                150,
+                40,
+                dev
+                );
+
+            quit_button = new Button(
+                "quit",
+                "Exit",
+                new Vector2(save_button.Position.X, save_button.Position.Y + 50),
+                150,
+                40,
+                dev
+                );
         }
 
         public override void Draw(SpriteBatch sprite, Matrix view)
@@ -87,7 +112,15 @@ namespace _24HourSurvival.GUI
                     unit_health_label.Draw(true, sprite, view, font);
                     unit_state_label.Draw(true, sprite, view, font);
                     Unit_Species.Draw(true, sprite, view, font);
+                    GeneLabel.Draw(true, sprite, view, font);
                 }
+            }
+
+            if (SimpleSurvival.Pause_Game)
+            {
+                pause_background.Draw(true, sprite, view, font);
+                save_button.Draw(true, sprite, view, font);
+                quit_button.Draw(true, sprite, view, font);
             }
         }
 
@@ -105,58 +138,62 @@ namespace _24HourSurvival.GUI
 
         public override void Update()
         {
-            if (Is_Active)
+            if (!SimpleSurvival.Pause_Game)
             {
-                string hour = CalendarSystem.Current_Hour.ToString();
-                if (hour.Length == 1)
+                if (Is_Active)
                 {
-                    hour = "0" + CalendarSystem.Current_Hour.ToString();
-                }
-                string minute = CalendarSystem.Current_Minute.ToString();
-                if (minute.Length == 1)
-                {
-                    minute = "0" + CalendarSystem.Current_Minute.ToString();
-                }
-                string second = Math.Round(CalendarSystem.Current_Second).ToString();
-                if (second.Length == 1)
-                {
-                    second = "0" + Math.Round(CalendarSystem.Current_Second).ToString();
-                }
-
-                string day = CalendarSystem.Day.ToString();
-                if (day.Length == 1)
-                {
-                    day = "0" + CalendarSystem.Day.ToString();
-                }
-                string month = CalendarSystem.Month.ToString();
-                if (month.Length == 1)
-                {
-                    month = "0" + CalendarSystem.Month.ToString();
-                }
-
-                this.MoreInfoLabel.Content = "Known Species: " + SimpleSurvival.survival_sim.species.Count;
-
-                this.TimeLabel.Content =
-                    "Time: " + hour + " : " + minute + " : " + second
-                    + " -- Date: " + day + " / " + month + " / " + CalendarSystem.Year 
-                    + " - Epoch: " + SimpleSurvival.survival_sim.epoch;
-
-                if (selected_creature != null)
-                {
-                    info_label.Content = "Score: " + selected_creature.GetScore().ToString();
-                    unit_health_label.Content = "Health: " + Math.Round(selected_creature.health) + " -- Energy: " + Math.Round(selected_creature.energy);
-                    unit_energy_label.Content = "Hunger: " + Math.Round(selected_creature.hunger);
-                    unit_state_label.Content = "State: " + selected_creature.get_state();
-                    if (SimpleSurvival.survival_sim.nets.ContainsKey(selected_creature.id))
+                    string hour = CalendarSystem.Current_Hour.ToString();
+                    if (hour.Length == 1)
                     {
-                        if (string.IsNullOrWhiteSpace(SimpleSurvival.survival_sim.nets[selected_creature.id].species_id))
-                            Unit_Species.Content = "unknown";
-                        else
-                            Unit_Species.Content = SimpleSurvival.survival_sim.nets[selected_creature.id].species_id;
+                        hour = "0" + CalendarSystem.Current_Hour.ToString();
                     }
-                }
+                    string minute = CalendarSystem.Current_Minute.ToString();
+                    if (minute.Length == 1)
+                    {
+                        minute = "0" + CalendarSystem.Current_Minute.ToString();
+                    }
+                    string second = Math.Round(CalendarSystem.Current_Second).ToString();
+                    if (second.Length == 1)
+                    {
+                        second = "0" + Math.Round(CalendarSystem.Current_Second).ToString();
+                    }
 
-                PopulationCountLabel.Content = "Population: " + SimpleSurvival.creatures.Count;
+                    string day = CalendarSystem.Day.ToString();
+                    if (day.Length == 1)
+                    {
+                        day = "0" + CalendarSystem.Day.ToString();
+                    }
+                    string month = CalendarSystem.Month.ToString();
+                    if (month.Length == 1)
+                    {
+                        month = "0" + CalendarSystem.Month.ToString();
+                    }
+
+                    this.MoreInfoLabel.Content = "Known Species: " + SimpleSurvival.survival_sim.species.Count;
+
+                    this.TimeLabel.Content =
+                        "Time: " + hour + " : " + minute + " : " + second
+                        + " -- Date: " + day + " / " + month + " / " + CalendarSystem.Year
+                        + " - Epoch: " + SimpleSurvival.survival_sim.epoch;
+
+                    if (selected_creature != null)
+                    {
+                        GeneLabel.Content = selected_creature.Gene_Sequence;
+                        info_label.Content = "Score: " + selected_creature.GetScore().ToString();
+                        unit_health_label.Content = "Health: " + Math.Round(selected_creature.health) + " -- Energy: " + Math.Round(selected_creature.energy);
+                        unit_energy_label.Content = "Hunger: " + Math.Round(selected_creature.hunger);
+                        unit_state_label.Content = "State: " + selected_creature.get_state();
+                        if (SimpleSurvival.survival_sim.nets.ContainsKey(selected_creature.id))
+                        {
+                            if (string.IsNullOrWhiteSpace(SimpleSurvival.survival_sim.nets[selected_creature.id].species_id))
+                                Unit_Species.Content = "unknown";
+                            else
+                                Unit_Species.Content = SimpleSurvival.survival_sim.nets[selected_creature.id].species_id;
+                        }
+                    }
+
+                    PopulationCountLabel.Content = "Population: " + SimpleSurvival.creatures.Count;
+                }
             }
         }
     }

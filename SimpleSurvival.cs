@@ -6,12 +6,14 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace _24HourSurvival
 {
     public class SimpleSurvival : Engine
     {
-        public static bool Pause = false;
+        int GameSeed = 102292;
+        public static bool Pause_Game = false;
         public static bool TrainingAlgorithm = false;
 
         public static NEAT_Survival_Sim survival_sim { get; set; }
@@ -21,6 +23,8 @@ namespace _24HourSurvival
 
         private CalendarSystem cs;
         public static Tile[][] world_map { get; set; }
+
+        public static List<string> codons { get; set; }
 
         public static Dictionary<string, Texture2D> texture_library { get; set; }
         public static Texture2D foodTexture { get; set; }
@@ -35,18 +39,6 @@ namespace _24HourSurvival
 
         public SimpleSurvival() : base("Default")
         {
-            genes = new Dictionary<int, (string gene_id, int energy_use, int metabolism, int regen_rate)>();
-            var codons = Generate_Codons(102292);
-            Random r = new Random(102292);
-            for (int i = 0; i < codons.Count; i++)
-            {
-                genes.Add(i, new (codons[i],
-                    r.Next(-1, 4), 
-                    r.Next(-1, 4), 
-                    r.Next(-1, 4))
-                    );
-            }
-
             Content.RootDirectory = "Content";
             IsMouseVisible = true;
         }
@@ -64,8 +56,18 @@ namespace _24HourSurvival
             cs = new CalendarSystem(this);
             CalendarSystem.Year = 3000;
 
-            survival_sim = new NEAT_Survival_Sim(3, 3, false, 0.40, 100, 2500);
-
+            survival_sim = new NEAT_Survival_Sim(3, 3, false, 0.40, 100, 2500, this.GameSeed);
+            genes = new Dictionary<int, (string gene_id, int energy_use, int metabolism, int regen_rate)>();
+            codons = Generate_Codons(GameSeed);
+            
+            for (int i = 0; i < codons.Count; i++)
+            {
+                genes.Add(i, new(codons[i],
+                    survival_sim.r.Next(-1, 4),
+                    survival_sim.r.Next(-1, 4),
+                    survival_sim.r.Next(-1, 4))
+                    );
+            }
             base.Initialize();
         }
 
@@ -89,8 +91,8 @@ namespace _24HourSurvival
             world_map = BuildMap(200, 200);
 
             // place the spawner
-            int x = new Random().Next(12, world_map[0].Length - 12) * 32;
-            int y = new Random().Next(12, world_map.Length - 12) * 32;
+            int x = survival_sim.r.Next(12, world_map[0].Length - 12) * 32;
+            int y = survival_sim.r.Next(12, world_map.Length - 12) * 32;
             spawner = new Creature_Spawner("1", "Spawner", spawnerTexture, new Vector2(x,y));
 
             ResetPopulation();
@@ -109,10 +111,37 @@ namespace _24HourSurvival
         private void ResetPopulation()
         {
             creatures = new List<Creature>();
-            // create first generation of creatures
-            foreach (var item in survival_sim.nets)
+            if (survival_sim.species.Count == 0)
             {
-                SpawnNewCreature(item.Key);
+                // create first generation of creatures
+                foreach (var item in survival_sim.nets)
+                {
+                    var cre = SpawnNewCreature(item.Key);
+                    creatures.Add(cre);
+                }
+            }
+            else if (survival_sim.species.Count > 0)
+            {
+                foreach (var item in survival_sim.species)
+                {
+                    Random r = survival_sim.r;
+                    Color c = new Color(r.Next(0,255), r.Next(0, 255), r.Next(0, 255), 1);
+                    foreach (string netID in item.Value.members)
+                    {
+                        var cre = SpawnNewCreature(netID);
+                        if (SimpleSurvival.survival_sim.species_dict.ContainsKey(item.Key))
+                        {
+                            cre.object_sprite = SimpleSurvival.survival_sim.species_dict[item.Key].species_color;
+                        }
+                        else
+                        {
+                            var nSprite = Engine.CreateCircle(SimpleSurvival._graphics.GraphicsDevice, 16, 32, 32, c);
+                            SimpleSurvival.survival_sim.species_dict.Add(item.Key, new (SimpleSurvival.survival_sim.epoch, nSprite));
+                            cre.object_sprite = nSprite;
+                        }
+                        creatures.Add(cre);
+                    }
+                }
             }
         }
 
@@ -124,48 +153,54 @@ namespace _24HourSurvival
                 if (MainGui.selected_creature != null)
                     MainGui.SetNewUnitSelected(null);
                 else
-                    Exit();
+                {
+                    Pause_Game = !Pause_Game;
+                    CalendarSystem.PauseCalendar();
+                }
             }
 
             if (CalendarSystem.TotalDays == 2)
                 TrainingAlgorithm = true;
 
-            if (!TrainingAlgorithm)
+            gui.Update();
+
+            if (!Pause_Game)
             {
-                // TODO: Add your update logic here
-                Cleanse_Creatures();
-                
-                Clear_Eaten_Food();
-
-                camera.Update();
-
-                Update_Creatures(gameTime);
-
-                Update_Food();
-
-                gui.Update();
-            }
-            else
-            {
-                if (!training)
+                if (!TrainingAlgorithm)
                 {
-                    // set training flag.
-                    training = true;
+                    // TODO: Add your update logic here
+                    Cleanse_Creatures();
 
-                    // run training algorithm.
-                    survival_sim.Run();
+                    Clear_Eaten_Food();
 
-                    // reset the calendar.
-                    CalendarSystem.Day = 0;
-                    CalendarSystem.TotalDays = 0;
+                    camera.Update();
 
-                    ResetPopulation();
+                    Update_Creatures(gameTime);
 
-                    MainGui.SetNewUnitSelected(null);
+                    Update_Food();
+                }
+                else
+                {
+                    if (!training)
+                    {
+                        // set training flag.
+                        training = true;
 
-                    // reset flags.
-                    training = false;
-                    TrainingAlgorithm = false;
+                        // run training algorithm.
+                        survival_sim.Run();
+
+                        // reset the calendar.
+                        CalendarSystem.Day = 0;
+                        CalendarSystem.TotalDays = 0;
+
+                        ResetPopulation();
+
+                        MainGui.SetNewUnitSelected(null);
+
+                        // reset flags.
+                        training = false;
+                        TrainingAlgorithm = false;
+                    }
                 }
             }
 
@@ -285,8 +320,8 @@ namespace _24HourSurvival
 
         private void SpawnFoodItem()
         {
-            int x = new System.Random().Next(3, world_map[0].Length - 4) * 32;
-            int y = new System.Random().Next(3, world_map.Length - 4) * 32;
+            int x = survival_sim.r.Next(3, world_map[0].Length - 4) * 32;
+            int y = survival_sim.r.Next(3, world_map.Length - 4) * 32;
 
             var center = new Vector2((world_map[0].Length * 32) / 2, (world_map.Length * 32) / 2);
             var n_vector = new Vector2(x, y);
@@ -350,13 +385,9 @@ namespace _24HourSurvival
             return;
         }
 
-        public static void SpawnNewCreature(string id)
+        public static Creature SpawnNewCreature(string id)
         {
-            var c = new Creature(id, "Creature", creatureTexture, spawner.position);
-
-            creatures.Add(c);
-
-            return;
+            return new Creature(id, "Creature", creatureTexture, spawner.position);
         }
 
         public List<string> Generate_Codons(int seed = 1000)
@@ -365,7 +396,7 @@ namespace _24HourSurvival
             int total_codons = 64;
             bool run = true;
             string[] nucleotides = new string[] { "a", "c", "g", "t" };
-            Random r = new Random(seed);
+            Random r = survival_sim.r;
 
             do
             {

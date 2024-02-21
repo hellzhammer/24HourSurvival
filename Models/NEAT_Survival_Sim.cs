@@ -1,11 +1,15 @@
 ﻿using Kronus_Neural.Activations;
 using Kronus_Neural.NEAT;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using System;
 using System.Collections.Generic;
 
 namespace _24HourSurvival.Models
 {
     public class NEAT_Survival_Sim : NEAT_Project
     {
+        public Dictionary<string, (int epoch_found, Texture2D species_color)> species_dict { get; set; }
         public Network winning_network { get; private set; }
         public NEAT_Survival_Sim(
             int input_count,
@@ -13,9 +17,13 @@ namespace _24HourSurvival.Models
             bool initFullyConnected,
             double chanceToConnect,
             int pop_max,
-            int training_epochs
+            int training_epochs, 
+            int seed
             )
         {
+            this.Seed = seed;
+            this.r = new System.Random(this.Seed);
+            this.species_dict = new Dictionary<string, (int epoch_found, Texture2D species_color)>();
             this.max_hidden_nodes = 64 - (input_count + output_count);
             this.mutate_activation = false;
             this.Allowed_Activations = new List<string>();
@@ -95,7 +103,7 @@ namespace _24HourSurvival.Models
                 }
                 else
                 {
-                    net = Network_Generator.Init_Connections_random_connections(net, this.chance_to_make_inital_connection, weight_init_min, weight_init_max);
+                    net = Network_Generator.Init_Connections_random_connections(net, r, this.chance_to_make_inital_connection, weight_init_min, weight_init_max);
                 }
                 nets.Add(net.network_id, net);
             }
