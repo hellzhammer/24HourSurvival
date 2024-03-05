@@ -5,6 +5,7 @@ using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text;
 
 namespace _24HourSurvival.Models
 {
@@ -12,8 +13,6 @@ namespace _24HourSurvival.Models
     {
         protected Vector2 LastKnownFoodPos;
 
-        protected enum State { Wander, Feed, Sleep }
-        protected State _state = State.Wander;
         public readonly string Gene_Sequence = string.Empty;
 
         public Creature(string ID, string obj_name, Texture2D texture, Vector2 position, int met_base = 1, int enr_base = 1, int reg_base = 2) : base(ID, obj_name, texture, position, met_base, enr_base, reg_base)
@@ -25,10 +24,11 @@ namespace _24HourSurvival.Models
 
                 MainGui.SetNewUnitSelected(this);
                 MainGui.Update_Info("Score: " + this.score);
+                BrainViewer.BuildNodeLayout(this);
             };
 
             target_pos = SimpleSurvival.spawner.position;
-            this.Gene_Sequence = this.GeneSequence();
+            this.Gene_Sequence = this.GeneSequenceNeurons();
         }
 
         public string get_state()
@@ -39,11 +39,27 @@ namespace _24HourSurvival.Models
         /// <summary>
         /// this function runs inputs through the neural networks and determines the state
         /// </summary>
-        public void DetermineState()
+        public void DetermineState(GameTime gt)
         {
+            Vector2 foodPos = Vector2.Zero;
+            if (this.creatureType == CreatureType.Vegetarian)
+            {
+                var sensefood = FoodSense();
+                foodPos = sensefood;
+            }
+            else{
+                var sensecreature = CreatureSense();
+                foodPos = sensecreature;
+            }
+            
+            
             var outp = SimpleSurvival.survival_sim.nets[this.id].Process(
                 new double[] 
                 { 
+                    foodPos.X,
+                    foodPos.Y,
+                    this.position.X,
+                    this.position.Y,
                     (double)this.health, 
                     (float)this.energy, 
                     (float)this.hunger
@@ -61,17 +77,32 @@ namespace _24HourSurvival.Models
             {
                 this._state = State.Feed;
             }
+            else
+            {
+                // discipline for lack of decisivness;
+                //this.score -= (float)gt.ElapsedGameTime.TotalSeconds;
+            }
         }
 
         public override void Update(GameTime gt)
         {
-            CanEatFoodCheck();
-            UpdateCreatureVitals_Base_AI(gt);
+            if (creatureType == CreatureType.Vegetarian)
+            {
+                FoodSense();
+            }
+            else
+            {
+                CreatureSense();
+            }
 
-            Sense();
+            UpdateCreatureVitals_Base_AI(gt);
 
             if (_state == State.Wander)
             {
+                if (speed != 60)
+                {
+                    speed = 60;
+                }
                 WanderBehaviour(gt);
             }
             else if (_state == State.Sleep)
@@ -80,24 +111,91 @@ namespace _24HourSurvival.Models
             }
             else if (_state == State.Feed)
             {
-                var nvect = FoodSense();
-                if (nvect == Vector2.Zero)
+                if (this.creatureType == CreatureType.Vegetarian)
                 {
-                    if (this._state != State.Sleep)
+                    CanEatFoodCheck();
+                    var nvect = FoodSense();
+                    if (nvect == Vector2.Zero)
                     {
-                        WanderBehaviour(gt);
+                        if (this._state != State.Sleep)
+                        {
+                            WanderBehaviour(gt);
+                        }
                     }
+                    else
+                    {
+                        target_pos = nvect;
+                        LastKnownFoodPos = nvect;
+                    }
+
+                    MoveToTarget(gt);
                 }
                 else
                 {
-                    target_pos = nvect;
-                    LastKnownFoodPos = nvect;
+                    HuntBehaviour(gt);
                 }
-
-                MoveToTarget(gt);
             }
 
             base.Update(gt);
+        }
+
+        private void HuntBehaviour(GameTime gt)
+        {
+            if (speed != 100)
+            {
+                speed = 100;
+            }
+            CanEatCreatureCheck();
+            var v = CreatureSense();
+            if (v != Vector2.Zero)
+            {
+                LastKnownFoodPos = v;
+                target_pos = v;
+            }
+            else
+            {
+                if (this._state != State.Sleep)
+                {
+                    WanderBehaviour(gt);
+                }
+            }
+
+            MoveToTarget(gt);
+        }
+
+        private Vector2 CreatureSense()
+        {
+            List<Creature> sensed_creature = new List<Creature>();
+            for (int f = 0; f < SimpleSurvival.creatures.Count; f++)
+            {
+                var dist = Vector2.Distance(SimpleSurvival.creatures[f].position, this.position);
+                if (dist < smell_radius || dist < sight_radius)
+                {
+                    sensed_creature.Add(SimpleSurvival.creatures[f]);
+                }
+            }
+
+            if (sensed_creature.Count > 0)
+            {
+                // find the absolute closest food item
+                var closest_food = sensed_creature[0];
+                var closest_dist = Vector2.Distance(sensed_creature[0].position, this.position);
+                for (int i = 1; i < sensed_creature.Count; i++)
+                {
+                    var n_dist = Vector2.Distance(sensed_creature[i].position, this.position);
+                    if (n_dist < closest_dist)
+                    {
+                        closest_dist = n_dist;
+                        closest_food = sensed_creature[i];
+                    }
+                }
+
+                return closest_food.position;
+            }
+            else
+            {
+                return Vector2.Zero;
+            }
         }
 
         private void WanderBehaviour(GameTime gt)
@@ -124,40 +222,6 @@ namespace _24HourSurvival.Models
             {
                 MoveToTarget(gt);
             }
-        }
-
-        private void Sense()
-        {           
-            // find all nearby food.
-            List<Food_Item> sensed_food = new List<Food_Item>();
-            for (int f = 0; f < SimpleSurvival.Food.Count; f++)
-            {
-                var dist = Vector2.Distance(SimpleSurvival.Food[f].position, this.position);
-                if (dist < smell_radius || dist < sight_radius)
-                {
-                    sensed_food.Add(SimpleSurvival.Food[f]);
-                }
-            }
-
-            if (sensed_food.Count > 0)
-            {
-                // find the absolute closest food item
-                var closest_food = sensed_food[0];
-                var closest_dist = Vector2.Distance(sensed_food[0].position, this.position);
-                for (int i = 1; i < sensed_food.Count; i++)
-                {
-                    var n_dist = Vector2.Distance(sensed_food[i].position, this.position);
-                    if (n_dist < closest_dist)
-                    {
-                        closest_dist = n_dist;
-                        closest_food = sensed_food[i];
-                    }
-                }
-
-                LastKnownFoodPos = closest_food.position;
-            }
-
-            return;
         }
 
         private Vector2 FoodSense()
@@ -198,9 +262,14 @@ namespace _24HourSurvival.Models
 
         public void UpdateCreatureVitals_Base_AI(GameTime gt)
         {
-            Handle_Hunger(gt);
+            var overeat = Handle_Hunger(gt);
 
-            Handle_Sleep(gt);
+            var oversleep = Handle_Sleep(gt);
+
+            if (overeat || oversleep)
+            {
+                this.score -= 0.000025f;
+            }
 
             ResetOverage();
 
@@ -214,44 +283,8 @@ namespace _24HourSurvival.Models
             // once every second brain activates
             if (next_update <= 0)
             {
-                this.DetermineState();
+                this.DetermineState(gt);
             }
-        }
-
-        public string GeneSequence()
-        {
-            string rtnval = string.Empty;
-
-            if (SimpleSurvival.survival_sim.nets.ContainsKey(this.id))
-            {
-                var net = SimpleSurvival.survival_sim.nets[this.id];
-                if (net != null)
-                {
-                    List<Neuron> neurons = new List<Neuron>();
-                    foreach (var n in net.Input_Neurons)
-                    {
-                        neurons.Add(n.Value);
-                    }
-
-                    foreach (var n in net.Output_Neurons)
-                    {
-                        neurons.Add(n.Value);
-                    }
-
-                    foreach (var n in net.Hidden_Neurons)
-                    {
-                        neurons.Add(n.Value);
-                    }
-
-                    for (int i = 0; i < neurons.Count; i++)
-                    {
-                        var s = SimpleSurvival.codons[int.Parse(neurons[i].gene_id)];
-                        rtnval += s;
-                    }
-                }
-            }
-
-            return rtnval;
         }
 
         private void Handle_Score(GameTime gt)
@@ -265,12 +298,13 @@ namespace _24HourSurvival.Models
             }
         }
 
-        private void Handle_Hunger(GameTime gt)
+        private bool Handle_Hunger(GameTime gt)
         {
             // if starving
             if (this.hunger <= 0.0f)
             {
-                this.health -= (float)gt.ElapsedGameTime.TotalSeconds;
+                this.health -= (float)gt.ElapsedGameTime.TotalSeconds * 10;
+                this.score -= (float)gt.ElapsedGameTime.TotalSeconds * 10;
             }
 
             // if not starving, reduce the hunger level
@@ -278,9 +312,18 @@ namespace _24HourSurvival.Models
             {
                 this.hunger -= (float)gt.ElapsedGameTime.TotalSeconds * actual_metablolism;
             }
+
+            bool rtnval = false;
+            if (this.hunger > 75.0f && this._state == State.Feed)
+            {
+                rtnval = true;
+                //this.score -= (float)gt.ElapsedGameTime.TotalSeconds / 10;
+            }
+
+            return rtnval;
         }
 
-        private void Handle_Sleep(GameTime gt)
+        private bool Handle_Sleep(GameTime gt)
         {
             if (_state != State.Sleep)
             {
@@ -295,10 +338,11 @@ namespace _24HourSurvival.Models
                 {
                     //this._state = State.Sleep;
                     this.actual_metablolism += (int)gt.ElapsedGameTime.TotalSeconds / 10;
+                    this.score -= (float)gt.ElapsedGameTime.TotalSeconds / 10;
                 }
             }
 
-            if (this._state == State.Sleep)
+            if (this._state == State.Sleep) 
             {
                 // sleep and recover
                 if (this.energy < base_attribute_value)
@@ -312,7 +356,17 @@ namespace _24HourSurvival.Models
                 {
                     this.actual_metablolism = metabolism_base;
                 }
+
+                bool rtnval = false;
+                if (energy >= base_attribute_value)
+                {
+                    rtnval = true;
+                    //this.score -= (float)gt.ElapsedGameTime.TotalSeconds / 10;
+                }
+                return rtnval;
             }
+
+            return false;
         }
 
         /// <summary>
@@ -388,12 +442,86 @@ namespace _24HourSurvival.Models
 
                         if (this.health < base_attribute_value)
                         {
-                            this.health += calories_from_food * 0.5f;
+                            this.health += calories_from_food * actual_regen_rate;
                         }
 
                         if (this.energy < base_attribute_value)
                         {
                             this.energy += 2;
+                        }
+                    }
+                }
+            }
+        }
+
+        public CreatureSaveModel SaveModel()
+        {
+            return new CreatureSaveModel()
+            {
+                lastFoodSourceX = (int)this.LastKnownFoodPos.X,
+                lastFoodSourceY = (int)this.LastKnownFoodPos.Y,
+                genesequence = this.Gene_Sequence,
+                CreatureType = (int)this.creatureType,
+                CreatureState = (int)this._state,
+                actual_energy_use = this.actual_energy_use,
+                actual_metablolism = this.actual_metablolism,
+                actual_regen_rate = this.actual_regen_rate,
+                base_attribute_value = this.base_attribute_value,
+                score = this.score,
+                hunger = this.hunger,
+                energy = this.energy,
+                health = this.health,
+                calories_from_food = this.calories_from_food,
+                smell_radius = this.smell_radius,
+                move_radius = this.move_radius,
+                sight_radius = this.sight_radius,
+                energy_use_base = this.energy_use_base,
+                metabolism_base = this.metabolism_base,
+                regen_rate_base = this.regen_rate_base,
+                speed = this.speed,
+                stop_distance = this.stop_distance,
+                targetX = (int)this.target_pos.X,
+                targetY = (int)this.target_pos.Y,
+                id = this.id,
+                thisX = this.position.X,
+                thisY = this.position.Y
+            };
+        }
+
+        private void CanEatCreatureCheck()
+        {
+            foreach (var item in SimpleSurvival.creatures)
+            {
+                bool canuse = false;
+                if (
+                    string.IsNullOrWhiteSpace(SimpleSurvival.survival_sim.nets[item.id].species_id) 
+                    || SimpleSurvival.survival_sim.nets[item.id].species_id != SimpleSurvival.survival_sim.nets[this.id].species_id
+                    )
+                {
+                    canuse = true;
+                }
+                if (
+                    /*item.creatureType == CreatureType.Vegetarian 
+                    &&*/ this.hunger < base_attribute_value 
+                    && canuse
+                    )
+                {
+                    var cre_rect = new Rectangle(this.position.ToPoint(), new Point(32, 32));
+                    var food_rect = new Rectangle(item.position.ToPoint(), new Point(32, 32));
+                    if (cre_rect.Intersects(food_rect))
+                    {
+                        item.health = 0;
+                        this.score++;
+                        this.hunger += calories_from_food;
+
+                        if (this.health < base_attribute_value)
+                        {
+                            this.health += calories_from_food * actual_regen_rate;
+                        }
+
+                        if (this.energy < base_attribute_value)
+                        {
+                            this.energy += 2 * actual_regen_rate;
                         }
                     }
                 }

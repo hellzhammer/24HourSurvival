@@ -28,3 +28,4 @@ C:\Users\mattp\OneDrive\Desktop\Trenches\24HourSurvival\obj\Debug\net6.0\ref\24H
 C:\Users\mattp\OneDrive\Desktop\Trenches\24HourSurvival\bin\Debug\net6.0\Content\Game_Font.xnb
 C:\Users\mattp\OneDrive\Desktop\Trenches\24HourSurvival\bin\Debug\net6.0\Kronus_Neural.dll
 C:\Users\mattp\OneDrive\Desktop\Trenches\24HourSurvival\bin\Debug\net6.0\Kronus_Neural.pdb
+C:\Users\mattp\OneDrive\Desktop\Trenches\24HourSurvival\bin\Debug\net6.0\Newtonsoft.Json.dll

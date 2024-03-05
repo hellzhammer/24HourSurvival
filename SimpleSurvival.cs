@@ -6,7 +6,6 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 
 namespace _24HourSurvival
 {
@@ -35,7 +34,7 @@ namespace _24HourSurvival
         public static List<Creature> creatures = new List<Creature>();
         public static Creature_Spawner spawner { get; set; }
 
-        public static Dictionary<int, (string gene_id, int energy_use, int metabolism, int regen_rate)> genes { get; set; }
+        public static Dictionary<int, (string gene_id, int energy_use, int metabolism, int regen_rate, bool isCarnivore)> genes { get; set; }
 
         public SimpleSurvival() : base("Default")
         {
@@ -54,18 +53,26 @@ namespace _24HourSurvival
 
             // prepare the galaxy component
             cs = new CalendarSystem(this);
-            CalendarSystem.Year = 3000;
+            CalendarSystem.Year = 0;
 
-            survival_sim = new NEAT_Survival_Sim(3, 3, false, 0.40, 100, 2500, this.GameSeed);
-            genes = new Dictionary<int, (string gene_id, int energy_use, int metabolism, int regen_rate)>();
+            survival_sim = new NEAT_Survival_Sim(7, 3, false, 0.85, 100, 2500, this.GameSeed);
+
+            genes = new Dictionary<int, (string gene_id, int energy_use, int metabolism, int regen_rate, bool isCarnivore)>();
             codons = Generate_Codons(GameSeed);
             
             for (int i = 0; i < codons.Count; i++)
             {
+                bool iscarn = false;
+                var carn = survival_sim.r.NextDouble();
+                if (carn >= 0.65)
+                {
+                    iscarn = true;
+                }
                 genes.Add(i, new(codons[i],
                     survival_sim.r.Next(-1, 4),
                     survival_sim.r.Next(-1, 4),
-                    survival_sim.r.Next(-1, 4))
+                    survival_sim.r.Next(-1, 4),
+                    iscarn)
                     );
             }
             base.Initialize();
@@ -81,7 +88,7 @@ namespace _24HourSurvival
             texture_library.Add("grass", Engine.CreateSquare(GraphicsDevice, 32, 32, (s) => Color.Green));
             texture_library.Add("hover", Engine.CreateSquare(GraphicsDevice, 32, 32, (s) => Color.Gray));
 
-            spawnerTexture = Engine.CreateCircle(GraphicsDevice, 16, 32, 32, Color.Red);
+            spawnerTexture = Engine.CreateCircle(GraphicsDevice, 32, 64, 64, Color.Red);
             foodTexture = Engine.CreateCircle(GraphicsDevice, 16, 32, 32, Color.Pink);
             creatureTexture = Engine.CreateCircle(GraphicsDevice, 16, 32, 32, Color.Black);
 
@@ -91,8 +98,8 @@ namespace _24HourSurvival
             world_map = BuildMap(200, 200);
 
             // place the spawner
-            int x = survival_sim.r.Next(12, world_map[0].Length - 12) * 32;
-            int y = survival_sim.r.Next(12, world_map.Length - 12) * 32;
+            int x = new Random().Next(24, world_map[0].Length - 24) * 32;
+            int y = new Random().Next(24, world_map.Length - 24) * 32;
             spawner = new Creature_Spawner("1", "Spawner", spawnerTexture, new Vector2(x,y));
 
             ResetPopulation();
@@ -169,7 +176,7 @@ namespace _24HourSurvival
                 if (!TrainingAlgorithm)
                 {
                     // TODO: Add your update logic here
-                    Cleanse_Creatures();
+                    Cull_Creatures();
 
                     Clear_Eaten_Food();
 
@@ -241,12 +248,12 @@ namespace _24HourSurvival
             if (MainGui.selected_creature != null)
             {
                 _spriteBatch.Draw(
-                Engine.CreateCircle(SimpleSurvival._graphics.GraphicsDevice, MainGui.selected_creature.move_radius, (int)MainGui.selected_creature.move_radius * 2, (int)MainGui.selected_creature.move_radius * 2, Color.Red * 0.5f),
+                Engine.CreateCircle(SimpleSurvival._graphics.GraphicsDevice, MainGui.selected_creature.smell_radius, (int)MainGui.selected_creature.smell_radius * 2, (int)MainGui.selected_creature.smell_radius * 2, Color.Red * 0.5f),
                 MainGui.selected_creature.position,
                 null,
                 Color.White,
                 MainGui.selected_creature.rotation,
-                new Vector2((MainGui.selected_creature.move_radius * 2) / 2, (MainGui.selected_creature.move_radius* 2) / 2),
+                new Vector2((MainGui.selected_creature.smell_radius * 2) / 2, (MainGui.selected_creature.smell_radius * 2) / 2),
                 MainGui.selected_creature.scale,
                 SpriteEffects.None,
                 1
@@ -358,7 +365,7 @@ namespace _24HourSurvival
             return;
         }
 
-        private void Cleanse_Creatures()
+        private void Cull_Creatures()
         {
             List<Creature> indexes = new List<Creature>();
             for (int i = 0; i < creatures.Count; i++)
@@ -387,7 +394,33 @@ namespace _24HourSurvival
 
         public static Creature SpawnNewCreature(string id)
         {
-            return new Creature(id, "Creature", creatureTexture, spawner.position);
+            Main:
+            Vector2 pos = Vector2.Zero;
+            for (int i = 0; i < world_map.Length; i++)
+            {
+                for (int j = 0; j < world_map[i].Length; j++)
+                {
+                    if (world_map[i][j].object_name == "WaterTile")
+                    {
+                        // do fuck all
+                    }
+                    else
+                    {
+                        var outp = SimpleSurvival.survival_sim.r.NextDouble();
+                        if (outp >= 0.99999)
+                        {
+                            pos = world_map[i][j].position;
+                        }
+                    }
+                }
+            }
+
+            if (pos == Vector2.Zero)
+            {
+                goto Main;
+            }
+
+            return new Creature(id, "Creature", creatureTexture, pos);
         }
 
         public List<string> Generate_Codons(int seed = 1000)

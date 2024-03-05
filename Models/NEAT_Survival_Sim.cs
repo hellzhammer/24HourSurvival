@@ -1,8 +1,6 @@
 ﻿using Kronus_Neural.Activations;
 using Kronus_Neural.NEAT;
-using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using System;
 using System.Collections.Generic;
 
 namespace _24HourSurvival.Models
@@ -25,12 +23,17 @@ namespace _24HourSurvival.Models
             this.r = new System.Random(this.Seed);
             this.species_dict = new Dictionary<string, (int epoch_found, Texture2D species_color)>();
             this.max_hidden_nodes = 64 - (input_count + output_count);
+            this.chance_to_make_inital_connection = 0.7;
+            this.chance_to_choose_initial_centroid = 0.75;
             this.mutate_activation = false;
             this.Allowed_Activations = new List<string>();
             this.Allowed_Activations.Add("Sigmoid");
+            this.Allowed_Activations.Add("TanH");
             //"Gaussian", "ReLU", "LeakyReLU", "Sigmoid", "Swish", "SoftPlus", "TanH"
 
             this.Clone_Elite = true;
+            this.use_recurrent = true;
+
             this.nets = new Dictionary<string, NeatNetwork>();
             this.species = new Dictionary<string, Species>();
             this.gene_tracker = new Genetic_Dictionary();

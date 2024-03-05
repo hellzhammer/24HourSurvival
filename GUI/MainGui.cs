@@ -12,18 +12,19 @@ namespace _24HourSurvival.GUI
     {
         private static bool display = true;
         public static Creature selected_creature { get; private set; }
+        public BrainViewer viewer { get; set; }
 
         Label TimeLabel { get; set; }
         Label SimulationNameLabel { get; set; }
         Label PopulationCountLabel { get; set; }
         Label MoreInfoLabel { get; set; }
 
-        static Label info_label { get; set; }
+        static Label Score_label { get; set; }
         static Label GeneLabel { get; set; }
 
         static Box side_panel_background { get; set; }
-        static Label unit_health_label { get; set; }
-        static Label unit_energy_label { get; set; }
+        static Label unit_health_energy_label { get; set; }
+        static Label unit_hunger_label { get; set; }
         static Label unit_state_label { get; set; }
         static Label Unit_Species { get; set; }
 
@@ -31,12 +32,16 @@ namespace _24HourSurvival.GUI
         Button save_button { get; set; }
         Button quit_button { get; set; }
 
+        Label NeuronCountLabel { get; set; }
+        Label ConnectionCountLabel { get; set; }
+
         public MainGui(GraphicsDevice dev, SpriteFont _font, string teamname)
         {
             if (font == null)
                 font = _font;
 
             build(dev, teamname);
+            viewer = new BrainViewer();
             this.Is_Active = true;
         }
 
@@ -53,33 +58,142 @@ namespace _24HourSurvival.GUI
 
         private void build(GraphicsDevice dev, string team_name)
         {
-            info_label = new Label("update", "Updates", new Vector2(16, 16), 300, 30, dev);
-            GeneLabel = new Label("genes", "Todo", new Vector2(16,64), 300, 30, dev);
-            info_label.Set_Background(Color.Black, dev);
+            Score_label = new Label("update", "Updates", new Vector2(32, 16), 400, 30, dev);
+            GeneLabel = new Label("genes", "Todo", new Vector2(32,64), 400, 30, dev);
+            GeneLabel.Set_Background(Color.Black * 0.9f, dev);
 
             Vector2 ui_pos = new Vector2(0, dev.DisplayMode.Height - 120);
-            this.background = new Box("background", ui_pos, dev.DisplayMode.Width, 120, dev);
-            TimeLabel = new Label("time", "Time: n/a", ui_pos, 500, 30, dev);
-
-            SimulationNameLabel = new Label("gname", team_name, new Vector2(ui_pos.X, ui_pos.Y + 40), 300, 30, dev);
-            PopulationCountLabel = new Label("system", "Population", new Vector2(ui_pos.X + 310, ui_pos.Y + 40), 300, 30, dev);
-            MoreInfoLabel = new Label("pcount", "** TO DO **", new Vector2(ui_pos.X + 610, ui_pos.Y + 40), 300, 30, dev);
-
+            this.background = new Box(
+                "background", 
+                ui_pos, 
+                dev.DisplayMode.Width, 
+                120, 
+                dev
+                );
+            
+            TimeLabel = new Label(
+                "time", 
+                "Time: n/a", 
+                ui_pos, 
+                500, 
+                30, 
+                dev
+                );
             TimeLabel.Set_Background(Color.Gray, dev);
 
-            side_panel_background = new Box("side_background", new Vector2(16, dev.DisplayMode.Height / 8), 300, 150, dev);
+            SimulationNameLabel = new Label(
+                "gname", 
+                team_name, 
+                new Vector2(ui_pos.X, ui_pos.Y + 40), 
+                300, 
+                30, 
+                dev
+                );
+            
+            PopulationCountLabel = new Label(
+                "system", 
+                "Population", 
+                new Vector2(ui_pos.X + 310, ui_pos.Y + 40), 
+                300, 
+                30, 
+                dev
+                );
+
+            MoreInfoLabel = new Label(
+                "pcount", 
+                "** TO DO **", 
+                new Vector2(ui_pos.X + 610, ui_pos.Y + 40), 
+                300, 
+                30, 
+                dev
+                );            
+
+            side_panel_background = new Box(
+                "side_background", 
+                new Vector2(32, 32), 
+                400, 
+                300, 
+                dev
+                );
+            side_panel_background.Set_Background(Color.Black * 0.85f, dev);
 
             // instanitate the side panel labels
-            unit_health_label = new Label("sel_name_label", "health", new Vector2(20, dev.DisplayMode.Height / 8), 200, 30, dev);
-            unit_energy_label = new Label("sel_health_label", "energy", new Vector2(20, (dev.DisplayMode.Height / 8) + 50), 200, 30, dev);
-            unit_state_label = new Label("sel_name_label", "hunger", new Vector2(20, (dev.DisplayMode.Height / 8) + 100), 200, 30, dev);
-            Unit_Species = new Label("sel_species_label", "species", new Vector2(16, (dev.DisplayMode.Height / 8) + 150), 300, 30, dev);
+            unit_health_energy_label = new Label(
+                "sel_name_label", 
+                "health", 
+                new Vector2(32, dev.DisplayMode.Height / 8), 
+                200, 
+                30, 
+                dev
+                );
+            unit_health_energy_label.Set_Background(Color.Black * 0.9f, dev);
 
-            pause_background = new Box("pause_background", new Vector2(650, 250), 300, 300, dev);
+            unit_hunger_label = new Label(
+                "sel_health_label", 
+                "energy", 
+                new Vector2(32, (dev.DisplayMode.Height / 8) + 50), 
+                200, 
+                30, 
+                dev
+                );
+            unit_hunger_label.Set_Background(Color.Black * 0.9f, dev);
+
+            unit_state_label = new Label(
+                "sel_name_label", 
+                "hunger", 
+                new Vector2(32, (dev.DisplayMode.Height / 8) + 100), 
+                200, 
+                30, 
+                dev
+                );
+            unit_state_label.Set_Background(Color.Black * 0.9f, dev);
+
+            Unit_Species = new Label(
+                "sel_species_label", 
+                "species", 
+                new Vector2(32, (dev.DisplayMode.Height / 8) + 150), 
+                400, 
+                30, 
+                dev
+                );
+            Unit_Species.Set_Background(Color.Black * 0.9f, dev);
+
+            this.ConnectionCountLabel = new Label(
+                "conCount",
+                "Connection Count",
+                new Vector2(32, (dev.DisplayMode.Height / 8) + 200),
+                400,
+                30,
+                dev
+                );
+            this.ConnectionCountLabel.Set_Background(Color.Black * 0.9f, dev);
+
+            this.NeuronCountLabel = new Label(
+                "neuronCount",
+                "Neuron Count",
+                new Vector2(32, (dev.DisplayMode.Height / 8) + 250),
+                400,
+                30,
+                dev
+                );
+            this.NeuronCountLabel.Set_Background(Color.Black * 0.9f, dev);
+
+            // pause section
+            pause_background = new Box(
+                "pause_background", 
+                new Vector2(650, 250), 
+                300, 
+                300, 
+                dev
+                );
+
             save_button = new Button(
                 "save", 
                 "Save", 
-                new Vector2(pause_background.Position.X + 25, pause_background.Position.Y + 20),
+                new Vector2(
+                    pause_background.Position.X + 25, 
+                    pause_background.Position.Y + 20
+                    ),
                 150,
                 40,
                 dev
@@ -104,16 +218,22 @@ namespace _24HourSurvival.GUI
                 this.SimulationNameLabel.Draw(true, sprite, view, font);
                 this.PopulationCountLabel.Draw(true, sprite, view, font);
                 this.MoreInfoLabel.Draw(true, sprite, view, font);
-                info_label.Draw(true, sprite, view, font);
+
                 if (display)
                 {
                     side_panel_background.Draw(true, sprite, view, font);
-                    unit_energy_label.Draw(true, sprite, view, font);
-                    unit_health_label.Draw(true, sprite, view, font);
+                    unit_hunger_label.Draw(true, sprite, view, font);
+                    unit_health_energy_label.Draw(true, sprite, view, font);
                     unit_state_label.Draw(true, sprite, view, font);
                     Unit_Species.Draw(true, sprite, view, font);
                     GeneLabel.Draw(true, sprite, view, font);
+                    NeuronCountLabel.Draw(true, sprite, view, font);
+                    ConnectionCountLabel.Draw(true, sprite, view, font);
+
+                    // draw the brain view
+                    viewer.Draw(sprite, view);
                 }
+                Score_label.Draw(true, sprite, view, font);
             }
 
             if (SimpleSurvival.Pause_Game)
@@ -126,9 +246,9 @@ namespace _24HourSurvival.GUI
 
         public static void Update_Info(string update_data)
         {
-            info_label.Content = update_data;
+            Score_label.Content = update_data;
             var measure = SimpleSurvival.Game_Font.MeasureString(update_data);
-            info_label.background = SimpleSurvival.CreateSquare(
+            Score_label.background = SimpleSurvival.CreateSquare(
                 SimpleSurvival._graphics.GraphicsDevice,
                 (int)measure.X,
                 (int)measure.Y,
@@ -179,10 +299,10 @@ namespace _24HourSurvival.GUI
                     if (selected_creature != null)
                     {
                         GeneLabel.Content = selected_creature.Gene_Sequence;
-                        info_label.Content = "Score: " + selected_creature.GetScore().ToString();
-                        unit_health_label.Content = "Health: " + Math.Round(selected_creature.health) + " -- Energy: " + Math.Round(selected_creature.energy);
-                        unit_energy_label.Content = "Hunger: " + Math.Round(selected_creature.hunger);
-                        unit_state_label.Content = "State: " + selected_creature.get_state();
+                        Score_label.Content = "Score: " + selected_creature.GetScore().ToString();
+                        unit_health_energy_label.Content = "Health: " + Math.Round(selected_creature.health) + " -- Energy: " + Math.Round(selected_creature.energy);
+                        unit_hunger_label.Content = "Hunger: " + Math.Round(selected_creature.hunger);
+                        unit_state_label.Content = "State: " + selected_creature.get_state() + " -- " + "Type: " + selected_creature.GetCreatureType().ToString();
                         if (SimpleSurvival.survival_sim.nets.ContainsKey(selected_creature.id))
                         {
                             if (string.IsNullOrWhiteSpace(SimpleSurvival.survival_sim.nets[selected_creature.id].species_id))
@@ -190,6 +310,11 @@ namespace _24HourSurvival.GUI
                             else
                                 Unit_Species.Content = SimpleSurvival.survival_sim.nets[selected_creature.id].species_id;
                         }
+                        this.ConnectionCountLabel.Content = "Connections: " + SimpleSurvival.survival_sim.nets[selected_creature.id].All_Connections.Count;
+                        this.NeuronCountLabel.Content = "Neuron Count: " + (SimpleSurvival.survival_sim.nets[selected_creature.id].Hidden_Neurons.Count + SimpleSurvival.survival_sim.nets[selected_creature.id].Input_Neurons.Count + SimpleSurvival.survival_sim.nets[selected_creature.id].Output_Neurons.Count);
+                        
+                        // update the brain view
+                        viewer.Update();
                     }
 
                     PopulationCountLabel.Content = "Population: " + SimpleSurvival.creatures.Count;

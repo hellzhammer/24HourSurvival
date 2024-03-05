@@ -1,12 +1,24 @@
 ﻿using _24HourSurvival.GUI;
 using Engine_lib;
+using Kronus_Neural.NEAT;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using System.Collections.Generic;
 
 namespace _24HourSurvival.Models
 {
     public class Creature_Model : GameObject
     {
+        public enum CreatureType
+        {
+            Carnivore,
+            Vegetarian
+        }
+        protected CreatureType creatureType = CreatureType.Vegetarian;
+
+        protected enum State { Wander, Feed, Sleep }
+        protected State _state = State.Wander;
+
         protected float score = 0.0f;
         public float hunger = 100;
         public float health = 100;
@@ -21,15 +33,15 @@ namespace _24HourSurvival.Models
         public float speed = 60;
         public float stop_distance = 0.8f;
 
-        public readonly float smell_radius = 320;
-        public readonly float sight_radius = 256;
-        public readonly float move_radius = 320;
+        public readonly float smell_radius = 450;
+        public readonly float sight_radius = 250;
+        public readonly float move_radius = 650;
 
         protected bool draw_radial = false;
 
-        protected readonly int metabolism_base = 1;
-        protected readonly int energy_use_base = 1;
-        protected readonly int regen_rate_base = 2;
+        protected int metabolism_base = 1;
+        protected int energy_use_base = 1;
+        protected int regen_rate_base = 2;
 
         protected int actual_metablolism = 1;
         protected int actual_energy_use = 1;
@@ -53,6 +65,11 @@ namespace _24HourSurvival.Models
             {
                 this.draw_radial = false;
             };
+        }
+
+        public CreatureType GetCreatureType()
+        {
+            return this.creatureType;
         }
 
         public override void Draw(SpriteBatch batch)
@@ -94,5 +111,147 @@ namespace _24HourSurvival.Models
             1
             );
         }
+
+        public string GeneSequenceNeurons()
+        {
+            string rtnval = string.Empty;
+
+            if (SimpleSurvival.survival_sim.nets.ContainsKey(this.id))
+            {
+                var net = SimpleSurvival.survival_sim.nets[this.id];
+                if (net != null)
+                {
+                    List<Neuron> neurons = new List<Neuron>();
+                    foreach (var n in net.Input_Neurons)
+                    {
+                        neurons.Add(n.Value);
+                    }
+
+                    foreach (var n in net.Output_Neurons)
+                    {
+                        neurons.Add(n.Value);
+                    }
+
+                    foreach (var n in net.Hidden_Neurons)
+                    {
+                        neurons.Add(n.Value);
+                    }
+
+                    for (int i = 0; i < neurons.Count; i++)
+                    {
+                        var in_gene = SimpleSurvival.genes[int.Parse(neurons[i].gene_id)];
+                        this.metabolism_base += in_gene.metabolism;
+                        this.energy_use_base += in_gene.energy_use;
+                        this.regen_rate_base += in_gene.regen_rate;
+
+                        if (in_gene.isCarnivore)
+                        {
+                            if (SimpleSurvival.survival_sim.r.NextDouble() <= 0.20)
+                            {
+                                this.creatureType = CreatureType.Carnivore;
+                            }
+                            else
+                            {
+                                this.creatureType = CreatureType.Vegetarian;
+                            }
+                        }
+                        else
+                        {
+                            this.creatureType = CreatureType.Vegetarian;
+                        }
+
+                        if (metabolism_base < 1)
+                        {
+                            metabolism_base = 1;
+                        }
+                        if (energy_use_base < 1)
+                        {
+                            energy_use_base = 1;
+                        }
+                        if (regen_rate_base < 1)
+                        {
+                            regen_rate_base = 1;
+                        }                        
+
+                        var s = SimpleSurvival.codons[int.Parse(neurons[i].gene_id)];
+                        rtnval += s;
+                    }
+                }
+            }
+
+            return rtnval;
+        }
+
+        /*public string GeneSequenceConnections()
+        {
+            string rtnval = string.Empty;
+
+            if (SimpleSurvival.survival_sim.nets.ContainsKey(this.id))
+            {
+                var net = SimpleSurvival.survival_sim.nets[this.id];
+                foreach (var connection in net.All_Connections)
+                {
+                    rtnval += SimpleSurvival.codons[int.Parse(connection.Value.Input)];
+                    var in_gene = SimpleSurvival.genes[int.Parse(connection.Value.Input)];
+                    this.metabolism_base += in_gene.metabolism;
+                    this.energy_use_base += in_gene.energy_use;
+                    this.regen_rate_base += in_gene.regen_rate;
+
+                    if (in_gene.isCarnivore)
+                    {
+                        if (SimpleSurvival.survival_sim.r.NextDouble() >= 0.99)
+                        {
+                            this.creatureType = CreatureType.Carnivore;
+                        }
+                        else
+                        {
+                            this.creatureType = CreatureType.Vegetarian;
+                        }
+                    }
+                    else
+                    {
+                        this.creatureType = CreatureType.Vegetarian;
+                    }
+
+                    rtnval += SimpleSurvival.codons[int.Parse(connection.Value.Output)];
+                    var out_gene = SimpleSurvival.genes[int.Parse(connection.Value.Output)];
+                    this.metabolism_base += out_gene.metabolism;
+                    this.energy_use_base += out_gene.energy_use;
+                    this.regen_rate_base += out_gene.regen_rate;
+
+                    if (in_gene.isCarnivore)
+                    {
+                        if (SimpleSurvival.survival_sim.r.NextDouble() >= 0.99)
+                        {
+                            this.creatureType = CreatureType.Carnivore;
+                        }
+                        else
+                        {
+                            this.creatureType = CreatureType.Vegetarian;
+                        }
+                    }
+                    else
+                    {
+                        this.creatureType = CreatureType.Vegetarian;
+                    }
+
+                    if (metabolism_base < 1)
+                    {
+                        metabolism_base = 1;
+                    }
+                    if (energy_use_base < 1)
+                    {
+                        energy_use_base = 1;
+                    }
+                    if (regen_rate_base < 1)
+                    {
+                        regen_rate_base = 1;
+                    }
+                    
+                }
+            }
+
+            return rtnval;
+        }*/
     }
 }
